@@ -9,9 +9,9 @@
 
 set -e  # 에러 발생 시 스크립트 중단
 
-# 1. 변수 설정 (사용자 환경에 맞게 수정 필요)
-REGION="ap-northeast-1"
-S3_BUCKET="your-s3-bucket-name"   # S3 버킷 이름
+# 1. 변수 설정
+REGION="ap-south-1"
+S3_BUCKET="lee-s3-bucket-cicd"
 DOCKER_NETWORK="app-network"      # Docker 네트워크 이름
 
 # 컨테이너 이름 (3명의 팀원)
@@ -34,12 +34,11 @@ echo "========== User Data Script Started: $(date) =========="
 apt-get update -y
 apt-get install -y curl unzip net-tools apt-transport-https ca-certificates gnupg lsb-release
 
-# 3. SSM 에이전트 설치 (이미 활성화된 경우 건너뜀)
-if ! systemctl is-active --quiet amazon-ssm-agent; then
+# 3. SSM 에이전트 설치 (snap 버전)
+if ! snap list amazon-ssm-agent &>/dev/null; then
     snap install amazon-ssm-agent --classic
-    systemctl enable amazon-ssm-agent
-    systemctl start amazon-ssm-agent
 fi
+snap start amazon-ssm-agent || true
 
 # 4. Docker 설치
 mkdir -p /etc/apt/keyrings
