@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx-deploy
+  name: nginx-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-deploy
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: nginx-deploy
+    spec:
+      containers:
+        - image: 036333380579.dkr.ecr.ap-south-1.amazonaws.com/lee/nginx:latest
+          name: nginx
+          resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+spec:
+  selector:
+    app: nginx-deploy
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: fastapi-deploy
+  name: fastapi-deploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fastapi-deploy
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: fastapi-deploy
+    spec:
+      containers:
+        - image: 036333380579.dkr.ecr.ap-south-1.amazonaws.com/lee/fastapi:latest
+          name: fastapi
+          resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-svc
+spec:
+  selector:
+    app: fastapi-deploy
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer

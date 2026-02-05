@@ -1,0 +1,96 @@
+name: Combined S3 Deployment
+
+on:
+    push:
+        branches: ["main"]
+        paths:
+            - "nginx/**"
+            - "fastapi/**"
+    workflow_dispatch:
+
+jobs:
+    deploy-nginx:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+                  aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+                  aws-region: "${{ secrets.AWS_REGION }}"
+
+            - name: Zip Nginx folder
+              run: |
+                  cd nginx
+                  zip -r ../nginx.zip .
+                  cd ..
+
+            - name: Upload Nginx to S3
+              run: |
+                  aws s3 cp nginx.zip s3://${{ secrets.S3_BUCKET_NAME }}/nginx.zip
+
+            - name: Deploy Nginx to EC2 via SSM
+              run: |
+                  aws ssm send-command \
+                    --instance-ids "${{ secrets.ECR_INSTANCE_ID }}" \
+                    --document-name "AWS-RunShellScript" \
+                    --comment "Deploying Nginx from S3" \
+                    --parameters '{
+                      "commands": [
+                        "mkdir -p /home/ubuntu/nginx-app",
+                        "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/nginx.zip /tmp/nginx.zip",
+                        "unzip -o /tmp/nginx.zip -d /home/ubuntu/nginx-app",
+                        "cd /home/ubuntu/nginx-app",
+                        "sudo docker build -t nginx-custom .",
+                        "sudo docker stop nginx-server || true",
+                        "sudo docker rm nginx-server || true",
+                        "sudo docker run -d --name nginx-server -p 80:80 nginx-custom"
+                      ]
+                    }' \
+                    --region ${{ secrets.AWS_REGION }}
+
+    deploy-fastapi:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+                  aws-secret-access-key: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+                  aws-region: "${{ secrets.AWS_REGION }}"
+
+            - name: Zip FastAPI folder
+              run: |
+                  cd fastapi
+                  zip -r ../fastapi.zip .
+                  cd ..
+
+            - name: Upload FastAPI to S3
+              run: |
+                  aws s3 cp fastapi.zip s3://${{ secrets.S3_BUCKET_NAME }}/fastapi.zip
+
+            - name: Deploy FastAPI to EC2 via SSM
+              run: |
+                  aws ssm send-command \
+                    --instance-ids "${{ secrets.ECR_INSTANCE_ID }}" \
+                    --document-name "AWS-RunShellScript" \
+                    --comment "Deploying FastAPI from S3" \
+                    --parameters '{
+                      "commands": [
+                        "mkdir -p /home/ubuntu/fastapi-app",
+                        "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/fastapi.zip /tmp/fastapi.zip",
+                        "unzip -o /tmp/fastapi.zip -d /home/ubuntu/fastapi-app",
+                        "cd /home/ubuntu/fastapi-app",
+                        "sudo docker build -t fastapi-custom .",
+                        "sudo docker stop fastapi-server || true",
+                        "sudo docker rm fastapi-server || true",
+                        "sudo docker run -d --name fastapi-server -p 8000:8000 fastapi-custom"
+                      ]
+                    }' \
+                    --region ${{ secrets.AWS_REGION }}
